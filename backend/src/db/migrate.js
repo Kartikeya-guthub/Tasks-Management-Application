@@ -1,6 +1,6 @@
 'use strict';
 
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '../../../.env') });
 
 const fs   = require('fs');
 const path = require('path');
@@ -60,7 +60,12 @@ async function runMigrations() {
   console.log('[migrate] All migrations complete.');
 }
 
-runMigrations().catch((err) => {
-  console.error('[migrate] ERROR:', err.message);
-  process.exit(1);
-});
+// Run immediately when invoked as a script; export for programmatic use.
+if (require.main === module) {
+  runMigrations().catch((err) => {
+    console.error('[migrate] ERROR:', err.message);
+    process.exit(1);
+  });
+}
+
+module.exports = { runMigrations };

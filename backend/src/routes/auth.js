@@ -19,6 +19,13 @@ router.post('/register', async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    if (!email || !password) {
+      return res.status(400).json({ error: { message: 'Email and password are required', code: 'VALIDATION_ERROR' } });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: { message: 'Password must be at least 8 characters', code: 'VALIDATION_ERROR' } });
+    }
+
     const password_hash = await bcrypt.hash(password, 12);
 
     const { rows } = await pool.query(
@@ -30,7 +37,11 @@ router.post('/register', async (req, res) => {
 
     res.status(201).json({ message: 'User registered successfully', user: rows[0] });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    // PostgreSQL unique violation on email
+    if (error.code === '23505') {
+      return res.status(409).json({ error: { message: 'Email already in use', code: 'CONFLICT' } });
+    }
+    res.status(400).json({ error: { message: error.message, code: 'BAD_REQUEST' } });
   }
 });
 
@@ -39,19 +50,23 @@ router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    if (!email || !password) {
+      return res.status(400).json({ error: { message: 'Email and password are required', code: 'VALIDATION_ERROR' } });
+    }
+
     const { rows } = await pool.query(
       'SELECT id, password_hash FROM users WHERE email = $1',
       [email]
     );
 
     if (rows.length === 0) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json({ error: { message: 'Invalid credentials', code: 'UNAUTHORIZED' } });
     }
 
     const user  = rows[0];
     const match = await bcrypt.compare(password, user.password_hash);
     if (!match) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json({ error: { message: 'Invalid credentials', code: 'UNAUTHORIZED' } });
     }
 
     const accessToken = jwt.sign(
@@ -91,7 +106,7 @@ router.post('/login', async (req, res) => {
 
     res.status(200).json({ message: 'Login successful' });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: { message: error.message, code: 'BAD_REQUEST' } });
   }
 });
 
@@ -99,14 +114,14 @@ router.post('/login', async (req, res) => {
 router.post('/refresh', async (req, res) => {
   try {
     const token = req.cookies.refreshToken;
-    if (!token) return res.status(401).json({ error: 'No refresh token' });
+    if (!token) return res.status(401).json({ error: { message: 'No refresh token', code: 'UNAUTHORIZED' } });
 
     // Verify JWT signature and expiry
     let payload;
     try {
       payload = jwt.verify(token, process.env.REFRESH_SECRET);
     } catch {
-      return res.status(401).json({ error: 'Invalid or expired refresh token' });
+      return res.status(401).json({ error: { message: 'Invalid or expired refresh token', code: 'UNAUTHORIZED' } });
     }
 
     // Check token exists in DB (not revoked/rotated)
@@ -115,7 +130,7 @@ router.post('/refresh', async (req, res) => {
       [hashToken(token)]
     );
     if (rows.length === 0) {
-      return res.status(401).json({ error: 'Refresh token revoked' });
+      return res.status(401).json({ error: { message: 'Refresh token revoked', code: 'UNAUTHORIZED' } });
     }
 
     // Rotate: delete old token, insert new one
@@ -157,7 +172,7 @@ router.post('/refresh', async (req, res) => {
 
     res.status(200).json({ message: 'Token refreshed' });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: { message: error.message, code: 'BAD_REQUEST' } });
   }
 });
 
@@ -176,7 +191,18 @@ router.post('/logout', async (req, res) => {
 
     res.status(200).json({ message: 'Logged out successfully' });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: { message: error.message, code: 'BAD_REQUEST' } });
+  }
+});
+
+// GET /api/auth/me — returns the logged-in user's profile
+const authMiddleware = require('../middleware/authMiddleware');
+
+router.get('/me', authMiddleware, async (req, res) => {
+  try {
+    res.status(200).json({ user: req.user });
+  } catch (error) {
+    res.status(400).json({ error: { message: error.message, code: 'BAD_REQUEST' } });
   }
 });
 

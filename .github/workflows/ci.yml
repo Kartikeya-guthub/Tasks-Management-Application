@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  # ── Backend: lint + test ─────────────────────────────────────────
+  backend:
+    name: Backend — lint & test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB:       taskmanager_test
+          POSTGRES_USER:     testuser
+          POSTGRES_PASSWORD: testpassword
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U testuser -d taskmanager_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV:      test
+      DATABASE_URL:  postgresql://testuser:testpassword@localhost:5432/taskmanager_test
+      JWT_SECRET:    ci_jwt_secret_do_not_use_in_production
+      REFRESH_SECRET: ci_refresh_secret_do_not_use_in_production
+      # 64 hex zeros = 32 bytes, valid AES-256 key for tests.
+      FIELD_ENC_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      LOG_LEVEL:     silent
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci
+        working-directory: backend
+
+      - name: Run database migrations
+        run: npm run migrate
+        working-directory: backend
+
+      - name: Run tests
+        run: npm test
+        working-directory: backend
+
+      - name: Lint
+        run: npm run lint
+        working-directory: backend
+
+  # ── Frontend: build ───────────────────────────────────────────────
+  frontend:
+    name: Frontend — build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Build
+        run: npm run build
+        working-directory: frontend
