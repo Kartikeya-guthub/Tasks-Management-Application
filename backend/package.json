@@ -44,6 +44,14 @@
     "rules": {
       "no-console": "off",
       "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }]
-    }
+    },
+    "overrides": [
+      {
+        "files": ["src/__tests__/**/*.js"],
+        "env": {
+          "jest": true
+        }
+      }
+    ]
   }
 }
