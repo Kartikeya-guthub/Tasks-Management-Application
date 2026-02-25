@@ -91,7 +91,7 @@ router.post('/login', async (req, res) => {
     res.cookie('accessToken', accessToken, {
       httpOnly: true,
       secure:   isProd(),
-      sameSite: 'Strict',
+      sameSite: isProd() ? 'none' : 'Strict',
       path:     '/',
       maxAge:   15 * 60 * 1000,
     });
@@ -99,7 +99,7 @@ router.post('/login', async (req, res) => {
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure:   isProd(),
-      sameSite: 'Strict',
+      sameSite: isProd() ? 'none' : 'Strict',
       path:     '/api/auth/refresh',
       maxAge:   7 * 24 * 60 * 60 * 1000,
     });
@@ -157,7 +157,7 @@ router.post('/refresh', async (req, res) => {
     res.cookie('accessToken', newAccessToken, {
       httpOnly: true,
       secure:   isProd(),
-      sameSite: 'Strict',
+      sameSite: isProd() ? 'none' : 'Strict',
       path:     '/',
       maxAge:   15 * 60 * 1000,
     });
@@ -165,7 +165,7 @@ router.post('/refresh', async (req, res) => {
     res.cookie('refreshToken', newRefreshToken, {
       httpOnly: true,
       secure:   isProd(),
-      sameSite: 'Strict',
+      sameSite: isProd() ? 'none' : 'Strict',
       path:     '/api/auth/refresh',
       maxAge:   7 * 24 * 60 * 60 * 1000,
     });
@@ -186,8 +186,8 @@ router.post('/logout', async (req, res) => {
       await pool.query('DELETE FROM refresh_tokens WHERE token_hash = $1', [hashToken(token)]);
     }
 
-    res.clearCookie('accessToken',  { path: '/' });
-    res.clearCookie('refreshToken', { path: '/api/auth/refresh' });
+    res.clearCookie('accessToken',  { path: '/',                  secure: isProd(), sameSite: isProd() ? 'none' : 'Strict' });
+    res.clearCookie('refreshToken', { path: '/api/auth/refresh',  secure: isProd(), sameSite: isProd() ? 'none' : 'Strict' });
 
     res.status(200).json({ message: 'Logged out successfully' });
   } catch (error) {

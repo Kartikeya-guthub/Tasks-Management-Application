@@ -11,9 +11,15 @@ const requestId = require('./middleware/requestId');
 
 const app = express();
 
+// Trust Render/Vercel reverse proxy so secure cookies work correctly.
+app.set('trust proxy', 1);
+
 // ── Middleware ────────────────────────────────────────────────────
 app.use(helmet());
-app.use(cors({ origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173', credentials: true }));
+app.use(cors({
+  origin: process.env.FRONTEND_URL || process.env.CLIENT_ORIGIN || 'http://localhost:5173',
+  credentials: true,
+}));
 
 // Attach X-Request-Id before anything else so every log line has it.
 app.use(requestId);
@@ -29,6 +35,9 @@ app.use(pinoHttp({
 
 app.use(express.json({ limit: '10kb' }));
 app.use(cookieParser());
+
+// ── Health check (Render pings this to keep the service alive) ──
+app.get('/health', (req, res) => res.status(200).send('OK'));
 
 // ── Routes ────────────────────────────────────────────────────────
 app.use('/api/auth',  require('./routes/auth'));

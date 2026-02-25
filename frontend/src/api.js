@@ -1,7 +1,10 @@
-// All requests go through the Vite proxy to http://localhost:5000
+// In dev: requests go through Vite proxy → http://localhost:5000
+// In prod: VITE_API_URL points to the Render backend
 // credentials: 'include' ensures cookies are sent with every request
 
-const BASE = '/api';
+const BASE = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : '/api';
 
 // Tracks whether a refresh is already in flight to prevent loops.
 let refreshing = false;

@@ -174,13 +174,42 @@ npm run test --workspace=frontend
 
 ## Deployment
 
-> Detailed deployment guides will be added in a later phase.
+**Live URLs**
 
-High-level steps:
-1. Set production environment variables on your host / PaaS.
-2. Build the frontend: `npm run build --workspace=frontend`
-3. Start the backend: `npm run start`
-4. The Express server serves the built frontend from `frontend/dist`.
+| Service | URL |
+|---|---|
+| Frontend | `https://your-app.vercel.app` *(update after deploy)* |
+| Backend | `https://your-api.onrender.com` *(update after deploy)* |
+
+**Stack**
+- Frontend → [Vercel](https://vercel.com) (free)
+- Backend → [Render](https://render.com) Web Service (free)
+- Database → Render PostgreSQL (free)
+
+**Backend environment variables (set on Render)**
+
+| Key | Value |
+|---|---|
+| `DATABASE_URL` | Render internal DB URL |
+| `JWT_SECRET` | long random string |
+| `REFRESH_SECRET` | different long random string |
+| `FIELD_ENC_KEY` | 64-char hex string |
+| `FRONTEND_URL` | `https://your-app.vercel.app` |
+| `NODE_ENV` | `production` |
+| `LOG_LEVEL` | `info` |
+
+**Frontend environment variable (set on Vercel)**
+
+| Key | Value |
+|---|---|
+| `VITE_API_URL` | `https://your-api.onrender.com` |
+
+**Deployment notes**
+- Cookies use `SameSite=None; Secure` in production for cross-origin support
+- CORS is restricted to `FRONTEND_URL` — no wildcards
+- PostgreSQL SSL enabled (`rejectUnauthorized: false`) for Render
+- `trust proxy` enabled so Express sees the real client IP behind Render's proxy
+- Render free tier sleeps after 15 min inactivity — first request may take ~30s
 
 ---
 
