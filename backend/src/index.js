@@ -22,13 +22,21 @@ app.use(cookieParser());
 app.use('/api/auth', require('./routes/auth'));
 
 // ── 404 ───────────────────────────────────────────────────────────
-app.use((_req, res) => res.status(404).json({ message: 'Not found' }));
+app.use((_req, res) => {
+  res.status(404).json({ error: { message: 'Not found', code: 'NOT_FOUND' } });
+});
 
 // ── Global error handler ──────────────────────────────────────────
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
-  console.error(err);
-  res.status(err.status || 500).json({ message: err.message || 'Internal Server Error' });
+  const isProd = process.env.NODE_ENV === 'production';
+  if (!isProd) console.error(err);
+  res.status(err.status || 500).json({
+    error: {
+      message: err.message || 'Internal Server Error',
+      code: err.code || 'INTERNAL_ERROR',
+    },
+  });
 });
 
 app.listen(PORT, () => {

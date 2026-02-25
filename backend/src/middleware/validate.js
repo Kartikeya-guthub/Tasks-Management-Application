@@ -2,14 +2,16 @@
 
 const { validationResult } = require('express-validator');
 
-/**
- * Express middleware that runs after express-validator chains.
- * Returns 422 with error details if any validation failed.
- */
 function validate(req, res, next) {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(422).json({ errors: errors.array() });
+    return res.status(400).json({
+      error: {
+        message: 'Validation failed',
+        code: 'VALIDATION_ERROR',
+        details: errors.array().map((e) => ({ field: e.path, message: e.msg })),
+      },
+    });
   }
   next();
 }
