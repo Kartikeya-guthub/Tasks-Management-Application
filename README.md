@@ -1,221 +1,345 @@
-# Task Management Application
+<h1 align="center">
+  📋 Task Management Application
+</h1>
 
-A full-stack task management app built with **Express** (backend) and **React + Vite** (frontend), containerised with Docker Compose.
+<p align="center">
+  <img src="https://img.shields.io/badge/Node.js-18.x-339933?style=for-the-badge&logo=node.js&logoColor=white" />
+  <img src="https://img.shields.io/badge/Express-4.x-000000?style=for-the-badge&logo=express&logoColor=white" />
+  <img src="https://img.shields.io/badge/React-18.x-61DAFB?style=for-the-badge&logo=react&logoColor=black" />
+  <img src="https://img.shields.io/badge/PostgreSQL-15-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" />
+  <img src="https://img.shields.io/badge/Vite-5.x-646CFF?style=for-the-badge&logo=vite&logoColor=white" />
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Deployed%20on-Render-46E3B7?style=for-the-badge&logo=render&logoColor=white" />
+  <img src="https://img.shields.io/badge/Frontend%20on-Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white" />
+  <img src="https://img.shields.io/github/actions/workflow/status/Kartikeya-guthub/Tasks-Management-Application/ci.yml?style=for-the-badge&label=CI&logo=github-actions" />
+</p>
+
+<p align="center">
+  <b>A production-ready full-stack Task Management app with JWT auth, AES-256-GCM field encryption, refresh token rotation, and full CRUD with search, filter &amp; pagination.</b>
+</p>
 
 ---
 
-## Table of Contents
+## 🔗 Live Links
 
-- [Architecture](#architecture)
-- [Prerequisites](#prerequisites)
-- [Quick Start (local)](#quick-start-local)
-- [Environment Variables](#environment-variables)
-- [Available Scripts](#available-scripts)
-- [Running with Docker](#running-with-docker)
-- [Database Migrations](#database-migrations)
-- [Running Tests](#running-tests)
-- [Deployment](#deployment)
-- [Contributing](#contributing)
+| | URL |
+|---|---|
+| 🌐 **Frontend (Vercel)** | https://task-management-application-taupe.vercel.app |
+| ⚙️ **Backend API (Render)** | https://tasks-management-application.onrender.com |
+| 💻 **GitHub Repository** | https://github.com/Kartikeya-guthub/Tasks-Management-Application |
 
 ---
 
-## Architecture
+## 📑 Table of Contents
+
+- [Architecture](#-architecture)
+- [Security Decisions](#-security-decisions)
+- [Prerequisites](#-prerequisites)
+- [Quick Start (Local)](#-quick-start-local)
+- [Environment Variables](#-environment-variables)
+- [Available Scripts](#-available-scripts)
+- [Database Migrations](#-database-migrations)
+- [Running Tests](#-running-tests)
+- [API Reference](#-api-reference)
+- [Deployment](#-deployment)
+
+---
+
+## 🏗 Architecture
 
 ```
-┌─────────────────────────────────────────────────┐
-│                   Client Browser                │
-└────────────────────────┬────────────────────────┘
-                         │ HTTP / WebSocket
-┌────────────────────────▼────────────────────────┐
-│           frontend/  (React + Vite)             │
-│           Served on  :5173 (dev)                │
-└────────────────────────┬────────────────────────┘
-                         │ REST API  /api/*
-┌────────────────────────▼────────────────────────┐
-│           backend/   (Express + Node)           │
-│           Listens on :5000                      │
-│                                                 │
-│  ┌──────────────┐   ┌──────────────────────┐   │
-│  │  PostgreSQL  │   │  Redis (optional)    │   │
-│  │  :5432       │   │  :6379               │   │
-│  └──────────────┘   └──────────────────────┘   │
-└─────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                      User's Browser                          │
+│              React 18 + Vite  (Vercel CDN)                   │
+│                                                              │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐    │
+│  │  Login   │  │ Register │  │  Tasks   │  │Protected │    │
+│  │  Page    │  │  Page    │  │  List    │  │  Route   │    │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘    │
+└───────┼─────────────┼─────────────┼──────────────┼──────────┘
+        │ HTTPS REST /api/*  credentials: include (HttpOnly cookies)
+        ▼             ▼             ▼               ▼
+┌──────────────────────────────────────────────────────────────┐
+│               Express Backend (Render Web Service)           │
+│                                                              │
+│  ┌────────────────┐   ┌────────────────┐                    │
+│  │  Auth Routes   │   │  Task Routes   │                    │
+│  │ /api/auth/*    │   │  /api/tasks/*  │                    │
+│  └───────┬────────┘   └───────┬────────┘                    │
+│  ┌───────▼────────────────────▼──────┐                      │
+│  │     authMiddleware (JWT verify)   │                      │
+│  └───────────────────┬──────────────┘                      │
+│  ┌───────────────────▼──────────────┐                      │
+│  │    AES-256-GCM Field Encryption  │                      │
+│  │  encrypt description on write   │                      │
+│  │  decrypt description on read    │                      │
+│  └───────────────────┬──────────────┘                      │
+└──────────────────────┼───────────────────────────────────────┘
+                       │ node-postgres (pg)
+                       ▼
+┌──────────────────────────────────────────────────────────────┐
+│              PostgreSQL 15 (Render Managed DB)               │
+│                                                              │
+│  ┌──────────┐   ┌─────────────────┐   ┌──────────────────┐  │
+│  │  users   │   │     tasks       │   │ refresh_tokens   │  │
+│  │ id(uuid) │   │ id (uuid)       │   │ token (hashed)   │  │
+│  │ email    │   │ user_id (fk)    │   │ user_id          │  │
+│  │ password │   │ title           │   │ expires_at       │  │
+│  │ (bcrypt) │   │ description*    │   │ revoked          │  │
+│  └──────────┘   │ status (enum)   │   └──────────────────┘  │
+│                 │ created_at      │                          │
+│                 └─────────────────┘                          │
+│   * description stored as AES-256-GCM ciphertext             │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-| Layer     | Technology              | Directory    |
-|-----------|-------------------------|--------------|
-| Frontend  | React 18, Vite, Axios   | `frontend/`  |
-| Backend   | Node 18, Express 4      | `backend/`   |
-| Database  | PostgreSQL 15           | Docker       |
-| Cache     | Redis 7 (optional)      | Docker       |
+### Layer Summary
+
+| Layer | Technology | Host |
+|---|---|---|
+| Frontend | React 18, Vite 5, React Router v6 | Vercel |
+| Backend | Node 18, Express 4, pino logging | Render |
+| Database | PostgreSQL 15 | Render Managed |
+| Auth | JWT (access 15m + refresh 7d) | HttpOnly cookies |
+| Encryption | AES-256-GCM (task description) | In-process |
+| CI/CD | GitHub Actions | GitHub |
 
 ---
 
-## Prerequisites
+## 🔐 Security Decisions
 
-| Tool       | Minimum version |
-|------------|-----------------|
-| Node.js    | 18.x            |
-| npm        | 9.x             |
-| Docker     | 24.x            |
-| Docker Compose | v2 plugin   |
+### 1. JWT in HttpOnly Cookies
+Access tokens (15 min TTL) and refresh tokens (7 days) are stored in `HttpOnly; Secure; SameSite=None` cookies — never in `localStorage`. This prevents XSS token theft.
+
+### 2. Refresh Token Rotation
+Every `/api/auth/refresh` call issues a **new** refresh token and revokes the old one in the `refresh_tokens` table. Reuse of an old token is rejected with `401`.
+
+### 3. AES-256-GCM Field Encryption
+Task `description` is encrypted at rest using AES-256-GCM with a fresh 12-byte IV per write. The stored format is `base64(iv + authTag + ciphertext)`. The key (`FIELD_ENC_KEY`) is a 64-char hex env var — never in source code.
+
+### 4. Password Hashing
+Passwords are hashed with `bcryptjs` at cost factor **12** before storage. Plain passwords never touch the database.
+
+### 5. CORS Locked Down
+CORS `origin` is set to `FRONTEND_URL` env var only. No wildcards. `credentials: true` for cookie support.
+
+### 6. Parameterized Queries
+All SQL uses `pg` parameterized queries (`$1, $2, ...`). No string concatenation in SQL — eliminates SQL injection.
+
+### 7. Helmet + Body Limit
+`helmet()` sets 11 security headers (CSP, HSTS, X-Frame-Options, etc.). Body size limited to `10kb`.
 
 ---
 
-## Quick Start (local)
+## ✅ Prerequisites
+
+| Tool | Minimum Version |
+|---|---|
+| Node.js | 18.x |
+| npm | 9.x |
+| Docker + Docker Compose v2 | 24.x |
+
+---
+
+## 🚀 Quick Start (Local)
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/<your-org>/task-management-application.git
-cd task-management-application
+git clone https://github.com/Kartikeya-guthub/Tasks-Management-Application.git
+cd Tasks-Management-Application
 
-# 2. Switch to the dev branch (optional)
-git checkout dev
-
-# 3. Install all dependencies (root + workspaces)
+# 2. Install all dependencies (root + workspaces)
 npm ci
 
-# 4. Copy and fill in environment variables
+# 3. Copy and fill environment variables
 cp .env.example .env
-# Edit .env — replace every placeholder value
+# Edit .env — fill in DATABASE_URL, JWT_SECRET, REFRESH_SECRET, FIELD_ENC_KEY
 
-# 5. Start both servers in watch mode
+# 4. Start Docker Postgres
+docker compose up -d db
+
+# 5. Run database migrations
+npm run migrate
+
+# 6. Start backend + frontend in watch mode
 npm run dev
-#   backend  → http://localhost:5000
-#   frontend → http://localhost:5173
+#  backend  → http://localhost:5000
+#  frontend → http://localhost:5173
 ```
 
 ---
 
-## Environment Variables
+## 🌍 Environment Variables
 
-All required variables are documented in [.env.example](.env.example).  
-**Never commit a real `.env` file.**  Copy `.env.example` → `.env` and fill in your own values.
+Copy `.env.example` → `.env` and fill in values. **Never commit `.env`.**
 
-Key variables:
+| Variable | Description | Example |
+|---|---|---|
+| `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@localhost:5435/db` |
+| `JWT_SECRET` | Signs access tokens | 64-char hex string |
+| `REFRESH_SECRET` | Signs refresh tokens | 64-char hex string |
+| `FIELD_ENC_KEY` | AES-256-GCM key for encryption | 64-char hex string |
+| `CLIENT_ORIGIN` | CORS origin (local dev) | `http://localhost:5173` |
+| `FRONTEND_URL` | CORS origin (production) | `https://your-app.vercel.app` |
+| `NODE_ENV` | Environment | `development` / `production` |
+| `LOG_LEVEL` | Pino log level | `info` |
+| `PORT` | Express port | `5000` |
 
-| Variable          | Description                        |
-|-------------------|------------------------------------|
-| `PORT`            | Express server port (default 5000) |
-| `DATABASE_URL`    | PostgreSQL connection string       |
-| `JWT_SECRET`      | Secret for signing JWT tokens      |
-| `VITE_API_BASE_URL` | API base URL consumed by Vite    |
+**Frontend (Vercel only)**
+
+| Variable | Value |
+|---|---|
+| `VITE_API_URL` | `https://tasks-management-application.onrender.com` |
 
 ---
 
-## Available Scripts
+## 📜 Available Scripts
 
 Run from the **repo root**:
 
-| Script              | Description                                  |
-|---------------------|----------------------------------------------|
-| `npm run dev`       | Start backend + frontend in development mode |
-| `npm run start`     | Start backend in production mode             |
-| `npm run migrate`   | Run database migrations                      |
-| `npm run test`      | Run all tests (backend + frontend)           |
-| `npm run lint`      | Lint all workspaces                          |
+| Script | Description |
+|---|---|
+| `npm run dev` | Start backend + frontend in watch mode |
+| `npm run migrate` | Run pending SQL migrations |
+| `npm run test` | Run all backend integration tests |
+| `npm run lint` | ESLint all workspaces |
+| `npm run build` | Production build (frontend) |
 
 ---
 
-## Running with Docker
+## 🗄 Database Migrations
 
 ```bash
-# Build and start all services (postgres, redis, backend, frontend)
-docker compose up --build
-
-# Run in detached mode
-docker compose up -d --build
-
-# Stop all services
-docker compose down
-
-# Destroy volumes (wipes DB data)
-docker compose down -v
-```
-
-Services exposed on localhost:
-
-| Service    | Port  |
-|------------|-------|
-| Frontend   | 5173  |
-| Backend    | 5000  |
-| PostgreSQL | 5432  |
-| Redis      | 6379  |
-
----
-
-## Database Migrations
-
-```bash
-# Apply pending migrations
+# Apply all pending migrations
 npm run migrate
 
-# (Inside backend workspace directly)
-cd backend
-npm run migrate
+# Migration files (backend/migrations/)
+# 001_create_users.sql
+# 002_create_tasks.sql          — includes task_status ENUM + indexes
+# 003_create_refresh_tokens.sql
 ```
+
+Migrations are tracked in a `schema_migrations` table. Already-applied files are skipped automatically.
 
 ---
 
-## Running Tests
+## 🧪 Running Tests
 
 ```bash
-# All workspaces
+# Run all backend integration tests (28 auth + tasks CRUD tests)
 npm run test
-
-# Backend only
-npm run test --workspace=backend
-
-# Frontend only
-npm run test --workspace=frontend
 ```
 
+Tests use a separate Docker Postgres on port `5436`. CI runs on every push to `main` via GitHub Actions.
+
 ---
 
-## Deployment
+## 📡 API Reference
 
-**Live URLs**
+**Base URL:** `https://tasks-management-application.onrender.com`
 
-| Service | URL |
-|---|---|
-| Frontend | `https://your-app.vercel.app` *(update after deploy)* |
-| Backend | `https://your-api.onrender.com` *(update after deploy)* |
+### Auth Routes
 
-**Stack**
-- Frontend → [Vercel](https://vercel.com) (free)
-- Backend → [Render](https://render.com) Web Service (free)
-- Database → Render PostgreSQL (free)
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/auth/register` | Register new user |
+| `POST` | `/api/auth/login` | Login, receive cookies |
+| `POST` | `/api/auth/refresh` | Rotate tokens |
+| `POST` | `/api/auth/logout` | Revoke token, clear cookies |
+| `GET` | `/api/auth/me` | Get current user |
 
-**Backend environment variables (set on Render)**
+### Task Routes (all require auth cookie)
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/tasks` | List tasks (paginated, filterable, searchable) |
+| `POST` | `/api/tasks` | Create task |
+| `GET` | `/api/tasks/:id` | Get single task |
+| `PUT` | `/api/tasks/:id` | Update task |
+| `DELETE` | `/api/tasks/:id` | Delete task |
+
+### cURL Examples
+
+```bash
+# Register
+curl -c cookies.txt -X POST https://tasks-management-application.onrender.com/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"demo@example.com","password":"demo1234"}'
+# Response 201: {"message":"User registered successfully","user":{"id":"...","email":"demo@example.com"}}
+
+# Login
+curl -c cookies.txt -X POST https://tasks-management-application.onrender.com/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"demo@example.com","password":"demo1234"}'
+# Response 200: {"message":"Login successful","user":{"id":"...","email":"demo@example.com"}}
+
+# Create Task
+curl -b cookies.txt -X POST https://tasks-management-application.onrender.com/api/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Fix bug","description":"Token expiry issue","status":"todo"}'
+# Response 201: {"id":"...","title":"Fix bug","description":"Token expiry issue","status":"todo","created_at":"..."}
+
+# List Tasks (search + filter + paginate)
+curl -b cookies.txt \
+  "https://tasks-management-application.onrender.com/api/tasks?status=todo&search=fix&page=1&limit=5"
+# Response 200: {"data":[...],"meta":{"total":3,"page":1,"limit":5,"totalPages":1}}
+
+# Refresh Tokens
+curl -b cookies.txt -c cookies.txt -X POST \
+  https://tasks-management-application.onrender.com/api/auth/refresh
+# Response 200: {"message":"Tokens refreshed"}
+
+# Logout
+curl -b cookies.txt -X POST https://tasks-management-application.onrender.com/api/auth/logout
+# Response 200: {"message":"Logged out"}
+```
+
+### Error Response Format
+
+All errors follow a consistent structure:
+
+```json
+{
+  "error": {
+    "message": "Human-readable message",
+    "code": "MACHINE_READABLE_CODE"
+  }
+}
+```
+
+Common error codes: `EMAIL_TAKEN`, `INVALID_CREDENTIALS`, `UNAUTHORIZED`, `NOT_FOUND`, `INVALID_STATUS`.
+
+---
+
+## 🚢 Deployment
+
+| Service | Platform | Trigger |
+|---|---|---|
+| Frontend | Vercel | Auto-deploys on push to `main` |
+| Backend | Render Web Service | Auto-deploys on push to `main` |
+| Database | Render PostgreSQL | Managed |
+
+**Backend env vars (set on Render → Environment):**
 
 | Key | Value |
 |---|---|
-| `DATABASE_URL` | Render internal DB URL |
-| `JWT_SECRET` | long random string |
-| `REFRESH_SECRET` | different long random string |
-| `FIELD_ENC_KEY` | 64-char hex string |
-| `FRONTEND_URL` | `https://your-app.vercel.app` |
 | `NODE_ENV` | `production` |
-| `LOG_LEVEL` | `info` |
+| `DATABASE_URL` | Render internal DB URL |
+| `JWT_SECRET` | 64-char hex |
+| `REFRESH_SECRET` | 64-char hex |
+| `FIELD_ENC_KEY` | 64-char hex |
+| `FRONTEND_URL` | `https://task-management-application-taupe.vercel.app` |
 
-**Frontend environment variable (set on Vercel)**
+**Frontend env var (set on Vercel → Settings → Environment Variables):**
 
 | Key | Value |
 |---|---|
-| `VITE_API_URL` | `https://your-api.onrender.com` |
+| `VITE_API_URL` | `https://tasks-management-application.onrender.com` |
 
-**Deployment notes**
-- Cookies use `SameSite=None; Secure` in production for cross-origin support
-- CORS is restricted to `FRONTEND_URL` — no wildcards
-- PostgreSQL SSL enabled (`rejectUnauthorized: false`) for Render
-- `trust proxy` enabled so Express sees the real client IP behind Render's proxy
-- Render free tier sleeps after 15 min inactivity — first request may take ~30s
+> 💡 **Tip:** Render free tier sleeps after 15 min of inactivity. Use [UptimeRobot](https://uptimerobot.com) to ping `/health` every 5 minutes to keep the server warm.
 
 ---
 
-## Contributing
-
-1. Fork the repo and create a feature branch off `dev`.
-2. Follow the [PR template](.github/PULL_REQUEST_TEMPLATE.md).
-3. Ensure `npm run test` and `npm run lint` pass before opening a PR.
-4. Target the `dev` branch for all pull requests.
+<p align="center">Built with ❤️ — Node.js · Express · React · PostgreSQL · Render · Vercel</p>
